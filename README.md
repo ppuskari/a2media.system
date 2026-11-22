@@ -45,6 +45,23 @@ silently truncating the listing. No existing HxCMOD audio sorting changes.
 The displayed JUKE position / total fields use five-digit decimal numbers,
 not hexadecimal.
 
+**SD vs USB source (one FatFS volume):** The MCU STORAGE menu has AUTO,
+USB ONLY and SD ONLY. AUTO chooses USB when a USB storage stick is attached,
+even if the ProTracker library is on SD. Both the MCU MOD console picker and
+A2MEDIA.SYSTEM browse the **same active mounted medium**, not all connected
+media at once. Put the ProDOS .po and your MOD library on the same active
+medium, or change STORAGE SOURCE to SD ONLY and RESCAN/REMOUNT ALL after
+making sure the bootable ProDOS image is also on SD. Otherwise neither
+browser will see the SD-only library. Previous M2 firmware also displayed
+an incorrect SOURCE indicator when a USB device was merely connected but
+SD had been selected; the MCU now reports the real FatFS backend.
+
+**Empty versus failed directories:** The browser now displays DIRECTORY READ
+FAILED with the M2 MCU result code when a directory open/list command
+fails, rather than misleadingly showing an empty folder. The MCU console
+also displays FatFS error and timeout status, with further diagnostic logs.
+
+
 The browser shows **NOW PLAYING** with the actual MOD filename reported by the MCU's generation-stable now-playing snapshot. It updates when the player advances tracks, including during jukebox playback without Apple keyboard input; only changed information triggers a screen redraw. M2 now uses a 16-bit software poll counter (~1 second on a stock 1 MHz IIe; quicker at accelerated CPU speeds) instead of relying on $C019 vertical-blank reads, which may not toggle with a2fpga video hardware. An idle player displays `(none)`. The same snapshot is used by the MCU console, so the highlighted file is not misrepresented as the active song.
 
 **Incremental 80-column screen updates:** The application issues Ctrl-L only on first
