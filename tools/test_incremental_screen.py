@@ -76,6 +76,23 @@ assert "inc RetryCountLo" in command and "inc RetryCountHi" in command
 assert "cmp #$80" in command and "lda #$e1" in command
 assert "lda #$eb" in command  # distinct whole-catalog timeout
 
+# IIgs ROM 3 may issue $C0B4 followed by $C0BA faster than the FPGA
+# accepts the write. Always capture the old sequence before command write,
+# then observe sequence progression AND matching ACK before accepting the
+# response. A transient command-pending bit must be waited out, not turned
+# into immediate $E5.
+assert "PreviousSeq:" in src
+assert "sta PreviousSeq" in command
+assert command.index("sta PreviousSeq") < command.index("sta MB_CMD")
+assert "cmp PreviousSeq" in command
+assert "lda MB_ACK" in command and "cmp Expected" in command
+assert "lda MB_FLAG" in command and "and #$05" in command
+idle = command.split("@idleWait:", 1)[1].split("@idle:", 1)[0]
+assert "cmp #$01" in idle and "dec TimeoutHigh" in idle
+assert "lda #$e5" in idle
+assert "@busy:" not in command  # cannot fail busy on just one flag read
+
+
 # Backward navigation uses an absolute 16-bit index into the MCU's cached
 # alphabetized folder. It never reopens or rescans the FAT directory.
 seek = region("ReopenAtPage", "BuildSelectedPath")
