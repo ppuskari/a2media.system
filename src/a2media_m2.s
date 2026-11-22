@@ -82,6 +82,7 @@ Start:
     sta PageNo
     sta PageCount
     sta PageEnd
+    sta BrowseError
     sta CurrentPath
     sta LastCmd
     sta LastResult
@@ -350,9 +351,12 @@ OpenDirectory:
     jsr SendWithPath
     lda LastResult
     bne @failure
+    lda #0
+    sta BrowseError
     jsr FetchPage
     rts
 @failure:
+    sta BrowseError
     lda #0
     sta PageCount
     lda #1
@@ -367,6 +371,7 @@ FetchPage:
     sta PageCount
     sta Selected
     sta PageEnd
+    sta BrowseError
 @loop:
     lda PageCount
     cmp #PAGE_SIZE
@@ -381,7 +386,11 @@ FetchPage:
     cmp #0
     bne @error
     jsr ReadEntry
-    bcs @error
+    bcc :+
+    lda #$ed               ; invalid/missing M2 reply frame
+    sta LastResult
+    jmp @error
+:
     inc PageCount
     jmp @loop
 @eof:
@@ -389,6 +398,8 @@ FetchPage:
     sta PageEnd
     jmp @done
 @error:
+    lda LastResult
+    sta BrowseError
     lda #1
     sta PageEnd
 @done:
@@ -555,6 +566,8 @@ ReopenAtPage:
     jsr FetchPage
     rts
 @error:
+    lda LastResult
+    sta BrowseError
     lda #0
     sta PageCount
     lda #1
@@ -1008,6 +1021,13 @@ DrawDirectory:
     bne @hasItems
     lda TextIndex
     bne @clear
+    lda BrowseError
+    beq @empty
+    SAY DirectoryError
+    lda BrowseError
+    jsr PrintHex
+    jmp @clear
+@empty:
     SAY EmptyFolder
     jmp @clear
 @hasItems:
@@ -1257,6 +1277,7 @@ Unmarked:    .asciiz "  "
 DirMark:     .asciiz "[DIR] "
 FileMark:    .asciiz " MOD  "
 EmptyFolder: .asciiz "No .MOD files or folders in this directory."
+DirectoryError:.asciiz "DIRECTORY READ FAILED - MCU RC: $"
 M2Missing:   .asciiz "M2 extension not detected. Install matching FPGA + BL616 M2 test builds."
 HelpLine1:   .asciiz "UP/DOWN or U/D: select   RETURN: enter directory / play selected MOD"
 HelpLine2:   .asciiz "J: JUKEBOX START AT FILE   F: prev page  G: next page  B: parent"
@@ -1292,6 +1313,7 @@ Selected:       .res 1
 PageNo:         .res 1
 PageCount:      .res 1
 PageEnd:        .res 1
+BrowseError:    .res 1
 KeyPressed:     .res 1
 LastCmd:        .res 1
 LastResult:     .res 1
