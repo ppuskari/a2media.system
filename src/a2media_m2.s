@@ -72,6 +72,7 @@ Start:
     sta Online
     sta M2Ready
     sta Selected
+    sta OldSelected
     sta PageNo
     sta PageCount
     sta PageEnd
@@ -136,11 +137,7 @@ MainLoop:
     inc PollTickHi
     bne @readKey
     jsr PollStatusAndTitle
-    lda ScreenDirty
-    beq @readKey
-    lda #0
-    sta ScreenDirty
-    jsr Draw
+    jsr DrawDirtyFields
 @readKey:
     lda KEY
     bpl MainLoop
@@ -229,7 +226,7 @@ MainLoop:
 
 DirectCommand:
     jsr SendCommand
-    jmp Redraw
+    jmp CommandChanged
 
 Probe:
     lda #0
@@ -452,60 +449,76 @@ EntryPointer:
 
 SelectDown:
     lda M2Ready
-    bne :+
-    jmp Redraw
-:
+    beq @done
     lda Selected
     clc
     adc #1
     cmp PageCount
-    bcc :+
-    jmp Redraw
-:
-    sta Selected
-    jmp Redraw
+    bcs @done
+    lda Selected
+    sta OldSelected
+    inc Selected
+    jsr DrawSelection
+@done:
+    jmp MainLoop
 SelectUp:
     lda Selected
-    bne :+
-    jmp Redraw
-:
+    beq @done
+    sta OldSelected
     dec Selected
-    jmp Redraw
+    jsr DrawSelection
+@done:
+    jmp MainLoop
+
 NextPage:
     lda M2Ready
-    bne :+
-    jmp Redraw
-:
+    beq @done
     lda PageEnd
-    beq :+
-    jmp Redraw
-:
+    bne @done
     inc PageNo
     jsr FetchPage
     lda PageCount
-    beq :+
-    jmp Redraw
-:
+    bne @changed
+    ; Walking beyond the final full page: restore current page.
     dec PageNo
     jsr ReopenAtPage
-    jmp Redraw
+@changed:
+    jmp PageChanged
+@done:
+    jmp MainLoop
 PreviousPage:
     lda M2Ready
-    bne :+
-    jmp Redraw
-:
+    beq @done
     lda PageNo
-    bne :+
-    jmp Redraw
-:
+    beq @done
     dec PageNo
     jsr ReopenAtPage
-    jmp Redraw
+    jmp PageChanged
+@done:
+    jmp MainLoop
 ReloadFolder:
     lda #0
     sta PageNo
     jsr OpenDirectory
-    jmp Redraw
+    jmp PageChanged
+
+; Limited updates: page changes affect only the 12 file rows, a folder
+; change affects the folder header plus those rows, and transport commands
+; affect only their footer fields. Never issue Ctrl-L again after startup.
+PageChanged:
+    jsr DrawDirectory
+    jsr DrawCommandResult
+    jmp MainLoop
+FolderChanged:
+    jsr DrawFolderHeader
+    jsr DrawDirectory
+    jsr DrawCommandResult
+    jmp MainLoop
+CommandChanged:
+    jsr DrawCommandResult
+    jsr PollStatusAndTitle
+    jsr DrawDirtyFields
+    jmp MainLoop
 
 ; Rewind the MCU directory, skip PageNo*12 entries, then load this page.
 ; Previous-page access does not disturb FTP or HxCMOD scan iterators.
@@ -589,15 +602,15 @@ BuildSelectedPath:
 ChooseEntry:
     lda M2Ready
     bne :+
-    jmp Redraw
+    jmp MainLoop
 :
     lda PageCount
     bne :+
-    jmp Redraw
+    jmp MainLoop
 :
     jsr BuildSelectedPath
     bcc :+
-    jmp Redraw
+    jmp MainLoop
 :
     ldx Selected
     lda Kinds,x
@@ -614,40 +627,40 @@ ChooseEntry:
     lda #0
     sta PageNo
     jsr OpenDirectory
-    jmp Redraw
+    jmp FolderChanged
 @play:
     jsr SetWorkPointer
     lda #PLAY_FILE
     jsr SendWithPath
-    jmp Redraw
+    jmp CommandChanged
 
 StartJukebox:
     lda M2Ready
     bne :+
-    jmp Redraw
+    jmp MainLoop
 :
     lda PageCount
     bne :+
-    jmp Redraw
+    jmp MainLoop
 :
     ldx Selected
     lda Kinds,x
     beq :+
-    jmp Redraw
+    jmp MainLoop
 :
     jsr BuildSelectedPath
     bcc :+
-    jmp Redraw
+    jmp MainLoop
 :
     jsr SetWorkPointer
     lda #JUKE_START
     jsr SendWithPath
-    jmp Redraw
+    jmp CommandChanged
 
 ParentFolder:
     lda M2Ready
     bne :+
-    jmp Redraw
+    jmp MainLoop
 :
     ldx #0
 @len:
@@ -679,7 +692,7 @@ ParentFolder:
     lda #0
     sta PageNo
     jsr OpenDirectory
-    jmp Redraw
+    jmp FolderChanged
 
 QuerySource:
     lda #SOURCE
@@ -696,7 +709,8 @@ QuerySource:
 
 RefreshStatus:
     jsr PollStatusAndTitle
-    jmp Redraw
+    jsr DrawDirtyFields
+    jmp MainLoop
 
 ; Get live status and NOW PLAYING from the same generation-stable snapshot
 ; shown in the MCU console. Polling does not change the Apple command/result
@@ -1048,6 +1062,7 @@ Old06:          .res 1
 Old07:          .res 1
 Old08:          .res 1
 Old09:          .res 1
+OldSelected:    .res 1
 Online:         .res 1
 M2Ready:        .res 1
 Selected:       .res 1
