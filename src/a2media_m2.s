@@ -851,9 +851,9 @@ PollStatusAndTitle:
     sta LastResult
     rts
 
-; One full clear at launch. All later updates are placed with the
-; IIe/IIgs 80-column firmware's Ctrl-^ gotoXY (x+32, y+32).
-; This avoids manual AUX RAM bank switching and screen flicker.
+; One full clear at launch. Later updates position the 80-col BASIC
+; firmware cursor using home, LF and forward-space without clearing the
+; screen or switching AUX RAM banks.
 Draw:
     lda #$8c              ; Ctrl-L: the ONLY full-screen clear
     jsr COUT
@@ -907,23 +907,35 @@ Draw:
     jsr DrawJukeValue
     rts
 
-; Position the 80-column firmware cursor without touching screen contents.
-; Input: X=0..79 column, A=0..23 row. Firmware Ctrl-^ (RS $1E) accepts
-; two subsequent printable bytes containing column+32 and row+32.
+; Portable 80-column BASIC/monitor output cursor placement.
+; Input: X=0..79 column, A=0..23 row. JSR $FDED goes through BASICOUT,
+; NOT the Pascal PWRITE path. Ctrl-^/$9E GOTOXY is only understood by
+; PWRITE; BASICOUT ignores it and prints the following two coordinates!
+; Use BASICOUT-supported controls: Ctrl-Y home (WITHOUT clearing),
+; Ctrl-J linefeed and Ctrl-\\ forward-space. No direct AUX RAM writes or
+; reliance on model-specific 80-col card cursor variables.
 SetCursor:
-    pha
-    txa
-    pha
-    lda #$9e
+    sta CursorRow
+    stx CursorCol
+    lda #$99              ; Ctrl-Y home, does NOT clear the display
     jsr COUT
-    pla
-    clc
-    adc #$a0
+    lda CursorRow
+    beq @columns
+@rows:
+    lda #$8a              ; Ctrl-J: down one physical row
     jsr COUT
-    pla
-    clc
-    adc #$a0
-    jmp COUT
+    dec CursorRow
+    bne @rows
+@columns:
+    lda CursorCol
+    beq @done
+@cols:
+    lda #$9c              ; Ctrl-\\: right one column, no character write
+    jsr COUT
+    dec CursorCol
+    bne @cols
+@done:
+    rts
 
 ; Clear only from the current cursor to the right edge, preserving the row.
 ClearToEol:
@@ -1305,6 +1317,8 @@ PollTickLo:     .res 1
 PollTickHi:     .res 1
 ScreenDirty:    .res 1
 DisplayRemain:  .res 1
+CursorRow:      .res 1
+CursorCol:      .res 1
 DecimalLo:      .res 1
 DecimalHi:      .res 1
 DecimalDivLo:   .res 1
