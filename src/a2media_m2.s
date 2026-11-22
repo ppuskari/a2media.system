@@ -1083,16 +1083,72 @@ DrawCommandResult:
     jmp PrintHex
 
 DrawJukeValue:
-    LOCATE 55,23
-    lda LastJukeHi
-    jsr PrintHex
+    ; Display 16-bit track index / total in decimal, five fixed columns each.
+    LOCATE 54,23
     lda LastJukeLo
-    jsr PrintHex
-    LOCATE 63,23
-    lda TotalHi
-    jsr PrintHex
+    ldx LastJukeHi
+    jsr PrintDecimal16
+    LOCATE 62,23
     lda TotalLo
-    jmp PrintHex
+    ldx TotalHi
+    jmp PrintDecimal16
+
+; A=lo, X=hi. Unsigned 16-bit decimal, always exactly five characters.
+; Five subtract/divisor passes are bounded (no CPU-specific math routines).
+PrintDecimal16:
+    sta DecimalLo
+    stx DecimalHi
+    lda #<10000
+    sta DecimalDivLo
+    lda #>10000
+    sta DecimalDivHi
+    jsr PrintDecimalDigit
+    lda #<1000
+    sta DecimalDivLo
+    lda #>1000
+    sta DecimalDivHi
+    jsr PrintDecimalDigit
+    lda #100
+    sta DecimalDivLo
+    lda #0
+    sta DecimalDivHi
+    jsr PrintDecimalDigit
+    lda #10
+    sta DecimalDivLo
+    lda #0
+    sta DecimalDivHi
+    jsr PrintDecimalDigit
+    lda #1
+    sta DecimalDivLo
+    lda #0
+    sta DecimalDivHi
+    jmp PrintDecimalDigit
+
+PrintDecimalDigit:
+    lda #0
+    sta DecimalDigit
+@compare:
+    lda DecimalHi
+    cmp DecimalDivHi
+    bcc @emit
+    bne @subtract
+    lda DecimalLo
+    cmp DecimalDivLo
+    bcc @emit
+@subtract:
+    sec
+    lda DecimalLo
+    sbc DecimalDivLo
+    sta DecimalLo
+    lda DecimalHi
+    sbc DecimalDivHi
+    sta DecimalHi
+    inc DecimalDigit
+    jmp @compare
+@emit:
+    lda DecimalDigit
+    ora #$b0
+    jmp COUT
 
 ; Bitmask: 1=filename, 2=player state, 4=jukebox position/count.
 ; Unlike a whole-screen refresh, each change touches just its own field.
@@ -1206,10 +1262,10 @@ Stopped:     .asciiz "IDLE / STOPPED"
 LastText:    .asciiz "    CMD: $"
 CmdLabel:    .asciiz "CMD: $"
 ResultLabel: .asciiz "RESULT: $"
-JukeLabel:   .asciiz "JUKE: $"
+JukeLabel:   .asciiz "JUKE: "
 ResultText:  .asciiz "  RESULT: $"
 JukeText:    .asciiz "  JUKE: $"
-OfText:      .asciiz " / $"
+OfText:      .asciiz " / "
 HexTab:      .byte "0123456789ABCDEF"
 
 .segment "BSS"
@@ -1249,6 +1305,11 @@ PollTickLo:     .res 1
 PollTickHi:     .res 1
 ScreenDirty:    .res 1
 DisplayRemain:  .res 1
+DecimalLo:      .res 1
+DecimalHi:      .res 1
+DecimalDivLo:   .res 1
+DecimalDivHi:   .res 1
+DecimalDigit:   .res 1
 SavedCmd:       .res 1
 SavedResult:    .res 1
 NowActive:      .res 1
