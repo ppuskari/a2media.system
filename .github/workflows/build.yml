@@ -1,0 +1,49 @@
+name: A2MEDIA P0 ProDOS 8 SYS build
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tools/**"
+      - "Makefile"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prodos8-system:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Install cc65 assembler/linker
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cc65
+          ca65 --version || true
+      - name: Assemble original 6502 and link ProDOS SYS at $2000
+        run: make check
+      - name: Publish SHA256 and binary contract
+        run: |
+          python3 tools/check_sys.py dist/A2MEDIA.SYSTEM
+          sha256sum dist/A2MEDIA.SYSTEM
+          ls -l dist/A2MEDIA.SYSTEM
+      - name: Upload ProDOS SYS executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: A2MEDIA-SYSTEM-P0
+          path: dist/A2MEDIA.SYSTEM
+          if-no-files-found: error
+      - name: Commit built executable into repository
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/A2MEDIA.SYSTEM
+          if git diff --cached --quiet; then
+            echo "Executable already matches tracked binary"
+          else
+            git commit -m "build: publish verified A2MEDIA.SYSTEM raw ProDOS 8 SYS executable [skip ci]"
+            git push origin HEAD:main
+          fi
