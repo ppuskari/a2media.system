@@ -201,3 +201,15 @@ little-endian catalog entry index, instead of reopening and rescanning the
 entire SD directory. The **matching M2 BL616 Stage 2 firmware is required**
 for both features; the FPGA bitstream and Floppy Emu slot-6 ProDOS boot
 device are unchanged. Hardware verification is still required.
+
+**Apple IIgs ROM 3 fast-mode mailbox guard:** The 2.8 MHz CPU can run
+instructions between slow slot I/O cycles faster than the IIe. The original
+`SendCommand` treated a single `$C0B3` busy sample as fatal `$E5`.
+It also read the FPGA sequence register `$C0BA` immediately after writing
+`$C0B4`, which could capture the preceding command sequence and accept
+a stale `$C0BB` acknowledgment. The corrected ProDOS app waits (bounded)
+for `READY && !PENDING`, captures the **previous** sequence *before*
+writing a command, and requires the sequence to change plus an ACK of the
+new sequence and an idle status. The M2 MCU/FPGA command ABI remains
+unchanged. Test on both IIe 1 MHz and ROM 3 IIgs fast mode; CI compilation
+and static regression guards do not replace real IIgs timing validation.
