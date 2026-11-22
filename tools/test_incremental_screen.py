@@ -39,8 +39,15 @@ paint = region("DrawSelection", "DrawNowPlaying")
 assert "    lda #$a0" in paint and "    lda #$be" in paint
 assert paint.count("jsr SetCursor") == 2
 
-# Apple 80-column firmware go-to-XY (Ctrl-^), clear-to-EOL (Ctrl-]).
-assert "    lda #$9e" in region("SetCursor", "ClearToEol")
+# $FDED uses BASICOUT, not Pascal PWRITE. Ctrl-^ GOTOXY is not handled
+# by this path: it prints the two coordinate bytes and destroys layout.
+# Home without clear, LF, and forward-space are safe BASICOUT controls.
+cursor = region("SetCursor", "ClearToEol")
+assert "    lda #$9e" not in cursor
+assert "    lda #$99" in cursor  # Ctrl-Y: home without clear
+assert "    lda #$8a" in cursor  # Ctrl-J: move down
+assert "    lda #$9c" in cursor  # Ctrl-backslash: move right
+assert "    dec CursorRow" in cursor and "    dec CursorCol" in cursor
 assert "    lda #$9d" in region("ClearToEol", "DrawFolderHeader")
 assert "LOCATE 13,22" in src
 assert "LOCATE 5,23" in src
