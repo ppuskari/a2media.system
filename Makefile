@@ -5,9 +5,9 @@ PYTHON ?= python3
 .PHONY: all check clean
 all: dist/A2MEDIA.SYSTEM
 
-build/a2media.o: src/a2media.s
+build/a2media.o: src/a2media_m2.s
 	mkdir -p build dist
-	$(CA65) -g -l build/A2MEDIA.lst src/a2media.s -o $@
+	$(CA65) -g -l build/A2MEDIA.lst src/a2media_m2.s -o $@
 
 dist/A2MEDIA.SYSTEM: build/a2media.o src/prodos8-system.cfg
 	$(LD65) -C src/prodos8-system.cfg -m build/A2MEDIA.map build/a2media.o -o $@
