@@ -14,6 +14,7 @@ C3ROM=$C300
 C3INT=$C00A
 KEY=$C000
 KEYCLR=$C010
+VBL=$C019              ; IIe/IIgs VBL bit7, falling edge once per frame
 MLI=$BF00
 MB_M=$C0B0
 MB_B=$C0B1
@@ -46,6 +47,7 @@ JUKE_START=$26
 RESUME=$27
 SOURCE=$28
 STATUS=$29
+NOWPLAY=$2A            ; reply [1+n, active, basename ASCII n<=63]
 DIR_EOF=$D0
 
 .macro SAY str
@@ -95,6 +97,14 @@ Start:
     sta WorkName
     sta UnusedSlot
     sta MBResultSaved
+    sta NowName
+    sta NowActive
+    sta WorkName
+    sta ScreenDirty
+    sta FrameCount
+    sta VBLPrev
+    sta SavedCmd
+    sta SavedResult
     sta C3INT
     jsr C3ROM
     lda #$92             ; Apple 80-column firmware Ctrl-R
@@ -112,8 +122,31 @@ Start:
     jsr QuerySource
     jsr OpenDirectory
 FirstScreen:
+    jsr PollStatusAndTitle
+    lda #0
+    sta ScreenDirty
     jsr Draw
 MainLoop:
+    ; Count vertical blanks rather than CPU loops: works at IIe and IIgs speed.
+    lda VBL
+    and #$80
+    cmp VBLPrev
+    beq @readKey
+    sta VBLPrev
+    bne @readKey
+    inc FrameCount
+    lda FrameCount
+    cmp #60
+    bcc @readKey
+    lda #0
+    sta FrameCount
+    jsr PollStatusAndTitle
+    lda ScreenDirty
+    beq @readKey
+    lda #0
+    sta ScreenDirty
+    jsr Draw
+@readKey:
     lda KEY
     bpl MainLoop
     and #$7f
@@ -159,11 +192,11 @@ MainLoop:
 @notB:
     cmp #'F'
     bne @notF
-    jmp NextPage
+    jmp PreviousPage
 @notF:
     cmp #'G'
     bne @notG
-    jmp PreviousPage
+    jmp NextPage
 @notG:
     cmp #'J'
     bne @notJ
@@ -891,18 +924,20 @@ FileMark:    .asciiz " MOD  "
 EmptyFolder: .asciiz "No .MOD files or folders in this directory."
 M2Missing:   .asciiz "M2 extension not detected. Install matching FPGA + BL616 M2 test builds."
 HelpLine1:   .asciiz "UP/DOWN or U/D: select   RETURN: enter directory / play selected MOD"
-HelpLine2:   .asciiz "J: JUKEBOX START AT FILE   F/G: next/previous page   B: parent folder"
+HelpLine2:   .asciiz "J: JUKEBOX START AT FILE   F: prev page  G: next page  B: parent"
 HelpLine3:   .asciiz "S: stop  R: resume  N/P: next/prev track  I: status  L: reload  Q: quit"
 MsgStatus:   .asciiz "LINK: "
 OfflineText: .asciiz "OFFLINE (slot-3 $C0B0 not found)"
 NeedM2:      .asciiz "M1 only; M2 required for directory reading"
 M2Online:    .asciiz "M2 READY"
+NowText:     .asciiz "NOW PLAYING: "
+NoNowPlaying:.asciiz "(none)"
 PlayerText:  .asciiz "MCU: "
 Playing:     .asciiz "PLAYING"
 Stopped:     .asciiz "IDLE / STOPPED"
 LastText:    .asciiz "    CMD: $"
 ResultText:  .asciiz "  RESULT: $"
-JukeText:    .asciiz "JUKE POSITION (hex): $"
+JukeText:    .asciiz "  JUKE: $"
 OfText:      .asciiz " / $"
 HexTab:      .byte "0123456789ABCDEF"
 
@@ -938,6 +973,13 @@ FrameIndex:     .res 1
 EntryKind:      .res 1
 UnusedSlot:     .res 1
 MBResultSaved:  .res 1
+FrameCount:     .res 1
+VBLPrev:        .res 1
+ScreenDirty:    .res 1
+SavedCmd:       .res 1
+SavedResult:    .res 1
+NowActive:      .res 1
+NowName:        .res 64
 CurrentPath:    .res 128
 WorkPath:       .res 128
 WorkName:       .res 64
