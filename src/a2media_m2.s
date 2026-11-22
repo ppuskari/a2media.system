@@ -14,7 +14,6 @@ C3ROM=$C300
 C3INT=$C00A
 KEY=$C000
 KEYCLR=$C010
-VBL=$C019              ; IIe/IIgs VBL bit7, falling edge once per frame
 MLI=$BF00
 MB_M=$C0B0
 MB_B=$C0B1
@@ -101,8 +100,8 @@ Start:
     sta NowActive
     sta WorkName
     sta ScreenDirty
-    sta FrameCount
-    sta VBLPrev
+    sta PollTickLo
+    sta PollTickHi
     sta SavedCmd
     sta SavedResult
     sta C3INT
@@ -127,19 +126,15 @@ FirstScreen:
     sta ScreenDirty
     jsr Draw
 MainLoop:
-    ; Count vertical blanks rather than CPU loops: works at IIe and IIgs speed.
-    lda VBL
-    and #$80
-    cmp VBLPrev
-    beq @readKey
-    sta VBLPrev
+    ; Poll off a 16-bit SOFTWARE counter, not RDVBLBAR ($C019). Some
+    ; a2fpga/video environments leave $C019 static, so the old VBL-edge
+    ; counter never reached 60 and NOW PLAYING only changed after 'I'.
+    ; A full 65536 idle iterations is approximately one second at 1 MHz;
+    ; faster IIgs CPUs refresh more frequently, with no blocking delay.
+    inc PollTickLo
     bne @readKey
-    inc FrameCount
-    lda FrameCount
-    cmp #60
-    bcc @readKey
-    lda #0
-    sta FrameCount
+    inc PollTickHi
+    bne @readKey
     jsr PollStatusAndTitle
     lda ScreenDirty
     beq @readKey
@@ -1080,8 +1075,8 @@ FrameIndex:     .res 1
 EntryKind:      .res 1
 UnusedSlot:     .res 1
 MBResultSaved:  .res 1
-FrameCount:     .res 1
-VBLPrev:        .res 1
+PollTickLo:     .res 1
+PollTickHi:     .res 1
 ScreenDirty:    .res 1
 SavedCmd:       .res 1
 SavedResult:    .res 1
