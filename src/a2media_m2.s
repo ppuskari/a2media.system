@@ -274,25 +274,61 @@ SendCommand:
     lda #$e0
     sta LastResult
     lda Online
-    beq @done
+    bne @online
+    rts
+@online:
+    ; IIgs fast-mode race: a preceding ACK may have become visible while
+    ; a new C0B3 status read still sees the old pending/ready state.
+    ; Never return E5 on a single busy sample. Wait for READY and !PENDING,
+    ; with a bounded timeout so a wedged FPGA still reports E5.
+    lda #$08
+    sta TimeoutHigh
+    ldy #$ff
+    ldx #$ff
+@idleWait:
     lda MB_FLAG
-    and #5
-    cmp #1
-    bne @busy
+    and #$05
+    cmp #$01
+    beq @idle
+    dex
+    bne @idleWait
+    dey
+    bne @idleWait
+    dec TimeoutHigh
+    bne @idleWait
+    lda #$e5
+    sta LastResult
+    rts
+@idle:
+    ; Read the sequence BEFORE posting the new command. On fast IIgs CPUs
+    ; C0B4 may be followed by C0BA before the 54MHz FPGA domain accepts
+    ; the write. Reading C0BA immediately after the write can return the
+    ; OLD sequence; the OLD ACK then appears to acknowledge the new call.
+    lda MB_SEQ
+    sta PreviousSeq
     lda LastCmd
     sta MB_CMD
-    lda MB_SEQ
-    sta Expected
-    ; ACK must still be prompt for each individual command. Scans never
-    ; run inside this handshake; only the later DIR_NEXT result is $EA.
+    ; The command must cause a NEW sequence, then a matching ACK. Do not
+    ; confuse stale ACKs with this command, even at 2.8MHz on a ROM 3 IIgs.
     lda #$08
     sta TimeoutHigh
     ldy #$ff
     ldx #$ff
 @wait:
+    lda MB_SEQ
+    cmp PreviousSeq
+    beq @againWait
+    sta Expected
     lda MB_ACK
     cmp Expected
+    bne @againWait
+    ; ACK and PENDING are updated together in the FPGA. Verify idle
+    ; before returning so subsequent ARM/DIR_NEXT commands are safe.
+    lda MB_FLAG
+    and #$05
+    cmp #$01
     beq @acked
+@againWait:
     dex
     bne @wait
     dey
@@ -305,27 +341,23 @@ SendCommand:
 @acked:
     lda MB_RC
     sta LastResult
-    cmp #$ea              ; M2 catalog not yet ready
+    cmp #$ea              ; M2 catalog is still being built
     bne @done
     lda LastCmd
     cmp #DIR_NEXT
-    bne @done             ; NOWPLAY $EA retains its previous semantics
+    bne @done             ; NOWPLAY $EA retains its prior semantics
     inc RetryCountLo
-    bne @again
+    bne @resend
     inc RetryCountHi
     lda RetryCountHi
-    cmp #$80              ; bounded: 32768 MCU poll requests
+    cmp #$80              ; bounded: 32768 pending catalog replies
     bcs @retryTimedOut
-@again:
+@resend:
     jmp @send
 @retryTimedOut:
-    lda #$eb              ; distinct from $E1 per-command ACK timeout
+    lda #$eb              ; overall scan wait, not per-command ACK timeout
     sta LastResult
 @done:
-    rts
-@busy:
-    lda #$e5
-    sta LastResult
     rts
 
 ; SendWithPath: A=M2 request code, TMPPTR=zero-terminated path pointer.
@@ -1355,6 +1387,7 @@ KeyPressed:     .res 1
 LastCmd:        .res 1
 LastResult:     .res 1
 Expected:       .res 1
+PreviousSeq:    .res 1
 TimeoutHigh:    .res 1
 RetryCountLo:   .res 1
 RetryCountHi:   .res 1
