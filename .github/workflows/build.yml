@@ -69,6 +69,19 @@ jobs:
           name: A2MEDIA-SYSTEM-P0
           path: dist/A2MEDIA.SYSTEM
           if-no-files-found: error
+      - name: Publish experimental M2 ProDOS SYS and images on isolated branch
+        if: github.ref == 'refs/heads/petar/m2-80col-fat-picker-20261122' && github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/A2MEDIA.SYSTEM \
+            disks/A2MEDIA-M2-ProDOS243.po disks/A2MEDIA-M2-ProDOS243.dsk
+          if git diff --cached --quiet; then
+            echo "Experimental M2 binary and disk images already current"
+          else
+            git commit -m "build: publish verified M2 P8 app and ProDOS243 disk images [skip ci]"
+            git push origin HEAD:petar/m2-80col-fat-picker-20261122
+          fi
       - name: Commit built executable into repository
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
