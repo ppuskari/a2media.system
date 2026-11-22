@@ -1,0 +1,4 @@
+build/
+__pycache__/
+*.pyc
+# dist/A2MEDIA.SYSTEM is the committed raw ProDOS 8 SYS binary.
