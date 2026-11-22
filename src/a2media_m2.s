@@ -242,6 +242,11 @@ SendCommand:
     sta MB_CMD
     lda MB_SEQ
     sta Expected
+    ; Three-byte bounded timeout: the IIgs can execute short 6502
+    ; polling loops much faster than the IIe. Allow the disk thread time
+    ; to answer an M2 directory call even under concurrent MOD loading.
+    lda #$08
+    sta TimeoutHigh
     ldy #$ff
     ldx #$ff
 @wait:
@@ -251,6 +256,8 @@ SendCommand:
     dex
     bne @wait
     dey
+    bne @wait
+    dec TimeoutHigh
     bne @wait
     lda #$e1
     sta LastResult
@@ -914,6 +921,7 @@ KeyPressed:     .res 1
 LastCmd:        .res 1
 LastResult:     .res 1
 Expected:       .res 1
+TimeoutHigh:    .res 1
 SourceUSB:      .res 1
 LastJukeLo:     .res 1
 LastJukeHi:     .res 1
