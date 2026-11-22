@@ -80,6 +80,10 @@ jobs:
             echo "Experimental M2 binary and disk images already current"
           else
             git commit -m "build: publish verified M2 P8 app and ProDOS243 disk images [skip ci]"
+            # Docs/source may have landed while CI was running. Rebase only the
+            # generated-file commit onto current remote; never force-push.
+            git fetch origin petar/m2-80col-fat-picker-20261122
+            git rebase origin/petar/m2-80col-fat-picker-20261122
             git push origin HEAD:petar/m2-80col-fat-picker-20261122
           fi
       - name: Commit built executable into repository
