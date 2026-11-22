@@ -68,6 +68,24 @@ assert "sta BrowseError" in region("OpenDirectory", "FetchPage")
 assert "sta BrowseError" in region("FetchPage", "ReadEntry")
 assert "sta BrowseError" in region("ReopenAtPage", "BuildSelectedPath")
 
+# Asynchronous FAT listing: OPEN ACKs promptly; only DIR_NEXT ($23) is
+# retried on the MCU's $EA not-ready result, with an explicit finite cap.
+command = region("SendCommand", "SendWithPath")
+assert "cmp #$ea" in command and "cmp #DIR_NEXT" in command
+assert "inc RetryCountLo" in command and "inc RetryCountHi" in command
+assert "cmp #$20" in command and "lda #$e1" in command
+
+# Backward navigation uses an absolute 16-bit index into the MCU's cached
+# alphabetized folder. It never reopens or rescans the FAT directory.
+seek = region("ReopenAtPage", "BuildSelectedPath")
+assert "lda #DIR_SEEK" in seek
+assert "lda #ARM" in seek
+assert "sta MB_DATA" in seek
+assert "jsr FetchPage" in seek
+assert "lda #DIR_OPEN" not in seek
+assert "lda #DIR_NEXT" not in seek
+assert "SeekLo:" in src and "SeekHi:" in src
+
 assert 'PlayingPadded:.asciiz "PLAYING       "' in src
 assert 'Stopped:     .asciiz "IDLE / STOPPED"' in src
 assert len("PLAYING       ") == len("IDLE / STOPPED") == 14
