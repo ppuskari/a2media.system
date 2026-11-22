@@ -57,6 +57,12 @@ DIR_EOF=$D0
     jsr PrintZ
 .endmacro
 
+.macro LOCATE col, row
+    ldx #col
+    lda #row
+    jsr SetCursor
+.endmacro
+
 .segment "CODE"
 Start:
     cld
@@ -831,59 +837,162 @@ PollStatusAndTitle:
     sta LastResult
     rts
 
-Redraw:
-    jsr Draw
-    jmp MainLoop
-
+; One full clear at launch. All later updates are placed with the
+; IIe/IIgs 80-column firmware's Ctrl-^ gotoXY (x+32, y+32).
+; This avoids manual AUX RAM bank switching and screen flicker.
 Draw:
-    lda #$8c              ; Ctrl-L: clear screen through 80-col firmware
+    lda #$8c              ; Ctrl-L: the ONLY full-screen clear
     jsr COUT
+    LOCATE 0,0
     SAY Title
-    jsr CR
+    LOCATE 0,1
     SAY SubTitle
-    jsr CR
+    LOCATE 0,2
     SAY Rule
-    jsr CR
+    LOCATE 0,4
+    SAY Rule
+    LOCATE 0,17
+    SAY Rule
+    LOCATE 0,18
+    SAY HelpLine1
+    LOCATE 0,19
+    SAY HelpLine2
+    LOCATE 0,20
+    SAY HelpLine3
+    LOCATE 0,21
+    SAY MsgStatus
+    lda Online
+    bne @online
+    SAY OfflineText
+    jmp @linkDone
+@online:
+    lda M2Ready
+    bne @m2online
+    SAY NeedM2
+    jmp @linkDone
+@m2online:
+    SAY M2Online
+@linkDone:
+    LOCATE 0,22
+    SAY NowText
+    LOCATE 0,23
+    SAY PlayerText
+    LOCATE 21,23
+    SAY CmdLabel
+    LOCATE 33,23
+    SAY ResultLabel
+    LOCATE 48,23
+    SAY JukeLabel
+    LOCATE 59,23
+    SAY OfText
+    jsr DrawFolderHeader
+    jsr DrawDirectory
+    jsr DrawNowPlaying
+    jsr DrawPlayerState
+    jsr DrawCommandResult
+    jsr DrawJukeValue
+    rts
+
+; Position the 80-column firmware cursor without touching screen contents.
+; Input: X=0..79 column, A=0..23 row. Firmware Ctrl-^ (RS $1E) accepts
+; two subsequent printable bytes containing column+32 and row+32.
+SetCursor:
+    pha
+    txa
+    pha
+    lda #$9e
+    jsr COUT
+    pla
+    clc
+    adc #$a0
+    jsr COUT
+    pla
+    clc
+    adc #$a0
+    jmp COUT
+
+; Clear only from the current cursor to the right edge, preserving the row.
+ClearToEol:
+    lda #$9d              ; Ctrl-] in 80-column firmware
+    jmp COUT
+
+DrawFolderHeader:
+    LOCATE 0,3
+    jsr ClearToEol
     SAY FolderLabel
     lda #<CurrentPath
     sta PTR
     lda #>CurrentPath
     sta PTR+1
-    jsr PrintZ
-    SAY SourceLabel
+    jsr PrintPathLimited
+    LOCATE 64,3
+    SAY SourceFixed
     lda SourceUSB
     beq @sd
     SAY USBName
-    jmp @srcDone
+    rts
 @sd:
     SAY SDName
-@srcDone:
-    jsr CR
-    SAY Rule
-    jsr CR
-    lda M2Ready
-    bne @displayEntries
-    SAY M2Missing
-    jsr CR
-    jmp @footer
-@displayEntries:
-    lda PageCount
-    bne @notEmpty
-    SAY EmptyFolder
-    jsr CR
-    jmp @footer
-@notEmpty:
+    rts
+
+; Physical 80-column row is bounded even for 127-byte FAT folder paths.
+; Truncated paths get "..." instead of wrapping into the fixed file table.
+PrintPathLimited:
+    lda #49
+    sta DisplayRemain
+@loop:
+    ldy #0
+    lda (PTR),y
+    beq @done
+    lda DisplayRemain
+    beq @more
+    dec DisplayRemain
+    lda (PTR),y
+    ora #$80
+    jsr COUT
+    inc PTR
+    bne @loop
+    inc PTR+1
+    jmp @loop
+@more:
+    SAY Ellipsis
+@done:
+    rts
+
+; Directory rows have permanent screen addresses, rows 5..16. Repaint
+; ONLY this rectangle on folder/page changes (not arrows, transport or
+; now-playing polls). Ctrl-] trims old long filenames from shorter rows.
+DrawDirectory:
     lda #0
     sta TextIndex
-@nextRow:
+@row:
+    lda TextIndex
+    clc
+    adc #5
+    ldx #0
+    jsr SetCursor
+    lda M2Ready
+    bne @ready
+    lda TextIndex
+    bne @clear
+    SAY M2Missing
+    jmp @clear
+@ready:
+    lda PageCount
+    bne @hasItems
+    lda TextIndex
+    bne @clear
+    SAY EmptyFolder
+    jmp @clear
+@hasItems:
     lda TextIndex
     cmp PageCount
-    bcs @footer
+    bcs @clear
     cmp Selected
-    bne @notSelected
+    bne @unselected
     SAY Marked
     jmp @prefixDone
-@notSelected:
+@unselected:
     SAY Unmarked
 @prefixDone:
     ldx TextIndex
@@ -898,73 +1007,97 @@ Draw:
     sta TempIndex
     jsr EntryPointer
     jsr PrintZ
-    jsr CR
+@clear:
+    jsr ClearToEol
     inc TextIndex
-    jmp @nextRow
-@footer:
-    SAY Rule
-    jsr CR
-    SAY HelpLine1
-    jsr CR
-    SAY HelpLine2
-    jsr CR
-    SAY HelpLine3
-    jsr CR
-    SAY MsgStatus
-    lda Online
-    bne @online
-    SAY OfflineText
-    jmp @afterStatus
-@online:
-    lda M2Ready
-    bne @m2online
-    SAY NeedM2
-    jmp @afterStatus
-@m2online:
-    SAY M2Online
-@afterStatus:
-    jsr CR
-    SAY NowText
+    lda TextIndex
+    cmp #PAGE_SIZE
+    bne @row
+    rts
+
+; Arrow keys change precisely two characters in video RAM: erase the old
+; '>' marker and paint the new one. The actual filename rows are untouched.
+DrawSelection:
+    lda OldSelected
+    clc
+    adc #5
+    ldx #0
+    jsr SetCursor
+    lda #$a0              ; space, with high bit set
+    jsr COUT
+    lda Selected
+    clc
+    adc #5
+    ldx #0
+    jsr SetCursor
+    lda #$be              ; '>'
+    jmp COUT
+
+DrawNowPlaying:
+    LOCATE 13,22           ; after static "NOW PLAYING: "
     lda NowActive
-    beq @noNow
+    beq @none
     lda #<NowName
     sta PTR
     lda #>NowName
     sta PTR+1
     jsr PrintZ
-    jmp @afterNow
-@noNow:
+    jmp ClearToEol
+@none:
     SAY NoNowPlaying
-@afterNow:
-    jsr CR
-    SAY PlayerText
-    lda Online
-    beq @notPlaying
-    lda MB_FLAG
-    and #$10
-    beq @notPlaying
-    SAY Playing
-    jmp @afterPlaying
-@notPlaying:
-    SAY Stopped
-@afterPlaying:
-    SAY LastText
+    jmp ClearToEol
+
+DrawPlayerState:
+    LOCATE 5,23
+    lda PlayerState
+    cmp #3                ; MOD_PCM_PLAYING
+    bne @stopped
+    SAY PlayingPadded     ; exactly 14 chars
+    rts
+@stopped:
+    SAY Stopped           ; exactly 14 chars
+    rts
+
+DrawCommandResult:
+    LOCATE 27,23
     lda LastCmd
     jsr PrintHex
-    SAY ResultText
+    LOCATE 42,23
     lda LastResult
-    jsr PrintHex
-    SAY JukeText
+    jmp PrintHex
+
+DrawJukeValue:
+    LOCATE 55,23
     lda LastJukeHi
     jsr PrintHex
     lda LastJukeLo
     jsr PrintHex
-    SAY OfText
+    LOCATE 63,23
     lda TotalHi
     jsr PrintHex
     lda TotalLo
-    jsr PrintHex
-    ; 24th text row: don't CR here, which would scroll the title away.
+    jmp PrintHex
+
+; Bitmask: 1=filename, 2=player state, 4=jukebox position/count.
+; Unlike a whole-screen refresh, each change touches just its own field.
+DrawDirtyFields:
+    lda ScreenDirty
+    and #1
+    beq @state
+    jsr DrawNowPlaying
+@state:
+    lda ScreenDirty
+    and #2
+    beq @juke
+    jsr DrawPlayerState
+@juke:
+    lda ScreenDirty
+    and #4
+    beq @done
+    jsr DrawJukeValue
+@done:
+    lda #0
+    sta ScreenDirty
     rts
 
 PrintZ:
@@ -1031,6 +1164,8 @@ SubTitle:    .asciiz "IIe / IIgs  |  80-column FAT file picker  |  44.1 kHz MCU 
 Rule:        .asciiz "-------------------------------------------------------------------------------"
 FolderLabel: .asciiz "FOLDER: /"
 SourceLabel: .asciiz "      SOURCE: "
+SourceFixed: .asciiz "SOURCE: "
+Ellipsis:    .asciiz "..."
 USBName:     .asciiz "USB"
 SDName:      .asciiz "SD"
 Marked:      .asciiz "> "
@@ -1050,8 +1185,12 @@ NowText:     .asciiz "NOW PLAYING: "
 NoNowPlaying:.asciiz "(none)"
 PlayerText:  .asciiz "MCU: "
 Playing:     .asciiz "PLAYING"
+PlayingPadded:.asciiz "PLAYING       "
 Stopped:     .asciiz "IDLE / STOPPED"
 LastText:    .asciiz "    CMD: $"
+CmdLabel:    .asciiz "CMD: $"
+ResultLabel: .asciiz "RESULT: $"
+JukeLabel:   .asciiz "JUKE: $"
 ResultText:  .asciiz "  RESULT: $"
 JukeText:    .asciiz "  JUKE: $"
 OfText:      .asciiz " / $"
@@ -1093,6 +1232,7 @@ MBResultSaved:  .res 1
 PollTickLo:     .res 1
 PollTickHi:     .res 1
 ScreenDirty:    .res 1
+DisplayRemain:  .res 1
 SavedCmd:       .res 1
 SavedResult:    .res 1
 NowActive:      .res 1
