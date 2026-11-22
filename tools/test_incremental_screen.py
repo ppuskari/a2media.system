@@ -73,7 +73,8 @@ assert "sta BrowseError" in region("ReopenAtPage", "BuildSelectedPath")
 command = region("SendCommand", "SendWithPath")
 assert "cmp #$ea" in command and "cmp #DIR_NEXT" in command
 assert "inc RetryCountLo" in command and "inc RetryCountHi" in command
-assert "cmp #$20" in command and "lda #$e1" in command
+assert "cmp #$80" in command and "lda #$e1" in command
+assert "lda #$eb" in command  # distinct whole-catalog timeout
 
 # Backward navigation uses an absolute 16-bit index into the MCU's cached
 # alphabetized folder. It never reopens or rescans the FAT directory.
