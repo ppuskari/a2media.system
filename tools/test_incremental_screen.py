@@ -46,8 +46,11 @@ assert "LOCATE 13,22" in src
 assert "LOCATE 5,23" in src
 assert "LOCATE 27,23" in src
 assert "LOCATE 42,23" in src
-assert "LOCATE 55,23" in src
-assert "LOCATE 63,23" in src
+assert "LOCATE 54,23" in src
+assert "LOCATE 62,23" in src
+assert "PrintDecimal16:" in src and "PrintDecimalDigit:" in src
+assert '.asciiz "JUKE: "' in src
+assert '.asciiz " / "' in src
 
 # Fixed-width state replacement must not slide subsequent status columns.
 assert 'PlayingPadded:.asciiz "PLAYING       "' in src
