@@ -314,12 +314,12 @@ SendCommand:
     bne @again
     inc RetryCountHi
     lda RetryCountHi
-    cmp #$20              ; bounded: 8192 MCU poll requests
+    cmp #$80              ; bounded: 32768 MCU poll requests
     bcs @retryTimedOut
 @again:
     jmp @send
 @retryTimedOut:
-    lda #$e1              ; unresponsive after extended pending interval
+    lda #$eb              ; distinct from $E1 per-command ACK timeout
     sta LastResult
 @done:
     rts
