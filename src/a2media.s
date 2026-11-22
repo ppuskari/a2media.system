@@ -75,49 +75,32 @@ Main:
     lda KEYCLR              ; clear keyboard strobe
     lda KeyChar
     cmp #$1b                ; ESC
-    beq ExitProgram
-    cmp #'q'
-    beq ExitProgram
+    beq DoQuit
+    and #$df                ; normalize lowercase alphabetic keys
     cmp #'Q'
-    beq ExitProgram
-    cmp #'i'
-    beq DoPing
+    beq DoQuit
     cmp #'I'
     beq DoPing
-    cmp #'s'
-    beq DoStop
     cmp #'S'
     beq DoStop
-    cmp #'n'
-    beq DoNext
     cmp #'N'
     beq DoNext
-    cmp #'p'
-    beq DoPrev
     cmp #'P'
     beq DoPrev
-    cmp #'l'
-    beq DoLast
     cmp #'L'
     beq DoLast
-    cmp #'f'
-    beq DoFolder
     cmp #'F'
     beq DoFolder
-    cmp #'t'
-    beq DoTree
     cmp #'T'
     beq DoTree
-    cmp #'o'
-    beq DoOnce
     cmp #'O'
     beq DoOnce
-    cmp #'r'
-    beq DoRepeat
     cmp #'R'
     beq DoRepeat
     jmp Main
 
+DoQuit:
+    jmp ExitProgram
 DoPing:
     lda #CMD_PING
     jmp Execute
@@ -275,8 +258,8 @@ AfterPlaying:
 
 ; Input PTR points to NUL-terminated ASCII. ROM COUT requires bit 7 set.
 PrintZ:
-    ldy #$00
 NextChar:
+    ldy #$00                ; do not assume 80-column ROM preserves Y
     lda (PTR),y
     beq EndText
     ora #$80
