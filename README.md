@@ -187,10 +187,13 @@ Original J2R11 beta FPGA/MCU binaries remain untouched.
 Copyright (c) 2026 Petar Puskarich / contributors. No public redistribution license selected.
 
 **Large-folder M2 timing fix:** The BL616 now ACKs directory OPEN immediately
-and builds its alphabetically sorted FAT catalog in short work chunks. On a
-directory NEXT request it returns MCU result `$EA` while the scan is
-in progress. This application recognizes that transient status and retries
-with a finite bound; an actual read error is reported as such. This fixes
+and builds its alphabetically sorted FAT catalog using a nonblocking FatFS
+broker. The MCU's slot-3 service task no longer waits for slow SD reads.
+On a directory NEXT request it returns MCU result `$EA` while the scan
+is in progress. The application retries `$EA` with a finite bound;
+`$E1` now denotes only a *single command ACK timeout*, and `$EB` means
+the entire folder scan stayed pending beyond the retry bound. Actual
+FatFS errors return `$E7`. This fixes
 the Apple-side `DIRECTORY READ FAILED - MCU RC: $E1` that occurred when
 `ProTracker/1` contained ~506 MOD files, even though the MCU console could
 browse it. Previous-page navigation now sends `M2_SEEK ($2B)` with a 16-bit
