@@ -47,6 +47,7 @@ RESUME=$27
 SOURCE=$28
 STATUS=$29
 NOWPLAY=$2A            ; reply [1+n, active, basename ASCII n<=63]
+DIR_SEEK=$2B           ; ARM + 2-byte LE offset into completed sorted catalog
 DIR_EOF=$D0
 
 .macro SAY str
@@ -562,30 +563,41 @@ CommandChanged:
 
 ; Rewind the MCU directory, skip PageNo*12 entries, then load this page.
 ; Previous-page access does not disturb FTP or HxCMOD scan iterators.
+; Seek directly within the BL616's complete sorted catalog. Older M2
+; reopened the FAT directory and sent PAGE_SIZE*PageNo NEXT commands,
+; forcing a full 506-file scan for every previous-page navigation.
+; The new M2 DIR_SEEK requires ARM, two raw bytes (16-bit LE index), SEEK.
+; We retain FetchPage's existing bounded asynchronous READY retry.
 ReopenAtPage:
-    jsr SetCurrentPointer
-    lda #DIR_OPEN
-    jsr SendWithPath
-    lda LastResult
-    bne @error
-    lda PageNo
-    sta SkipCount
-@skipPage:
-    lda SkipCount
-    beq @readPage
-    ldx #PAGE_SIZE
-@skipEntry:
-    stx TextIndex
-    lda #DIR_NEXT
+    lda #0
+    sta SeekLo
+    sta SeekHi
+    ldx PageNo
+@mul:
+    cpx #0
+    beq @send
+    clc
+    lda SeekLo
+    adc #PAGE_SIZE
+    sta SeekLo
+    lda SeekHi
+    adc #0
+    sta SeekHi
+    dex
+    jmp @mul
+@send:
+    lda #ARM
     jsr SendCommand
     lda LastResult
     bne @error
-    ldx TextIndex
-    dex
-    bne @skipEntry
-    dec SkipCount
-    jmp @skipPage
-@readPage:
+    lda SeekLo
+    sta MB_DATA
+    lda SeekHi
+    sta MB_DATA
+    lda #DIR_SEEK
+    jsr SendCommand
+    lda LastResult
+    bne @error
     jsr FetchPage
     rts
 @error:
@@ -1346,6 +1358,8 @@ Expected:       .res 1
 TimeoutHigh:    .res 1
 RetryCountLo:   .res 1
 RetryCountHi:   .res 1
+SeekLo:         .res 1
+SeekHi:         .res 1
 SourceUSB:      .res 1
 LastJukeLo:     .res 1
 LastJukeHi:     .res 1
