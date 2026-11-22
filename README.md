@@ -26,10 +26,10 @@ the repository's **main** branch.
 - **Return:** enter a highlighted folder or play one highlighted .MOD
 - **J:** start a whole-folder jukebox at the highlighted .MOD file
 - **B** (or Left Arrow): go to parent directory
-- **F/G:** next / previous directory page (12 entries per page)
+- **F/G:** previous / next directory page (12 entries per page)
 - **S:** stop; **R:** resume stopped jukebox
 - **N/P:** next / previous jukebox track
-- **I:** refresh MCU playback status and current playlist position
+- **I:** refresh MCU playback status and current playlist position (also updates automatically about once per second)
 - **L:** reload current FAT folder; **Q/Esc:** ProDOS MLI QUIT
 
 M2 lists FAT directories and case-insensitive .MOD files using a dedicated
@@ -38,6 +38,8 @@ backend**, reported at the top. Files appear in FAT directory order.
 **The MCU's J2R11 jukebox still sorts its own playlist** and resolves the
 full selected path to the proper starting index; starting from the
 highlighted song is exact, independent of UI list order.
+
+The browser shows **NOW PLAYING** with the actual MOD filename reported by the MCU's generation-stable now-playing snapshot. It updates when the player advances tracks, including during jukebox playback without Apple keyboard input; only changed information triggers a screen redraw. An idle player displays `(none)`. The same snapshot is used by the MCU console, so the highlighted file is not misrepresented as the active song.
 
 The custom **bidirectional M2 reply FIFO** preserves the existing M1
 Apple $C0B0–$C0BF ABI; data is read via $C0B5, opposite to its existing
