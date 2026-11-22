@@ -60,6 +60,14 @@ assert '.asciiz "JUKE: "' in src
 assert '.asciiz " / "' in src
 
 # Fixed-width state replacement must not slide subsequent status columns.
+# Failed OPEN/DIR_NEXT must be rendered as an error, not a false empty folder.
+assert "BrowseError:" in src
+assert "DirectoryError:" in src
+assert "SAY DirectoryError" in src
+assert "sta BrowseError" in region("OpenDirectory", "FetchPage")
+assert "sta BrowseError" in region("FetchPage", "ReadEntry")
+assert "sta BrowseError" in region("ReopenAtPage", "BuildSelectedPath")
+
 assert 'PlayingPadded:.asciiz "PLAYING       "' in src
 assert 'Stopped:     .asciiz "IDLE / STOPPED"' in src
 assert len("PLAYING       ") == len("IDLE / STOPPED") == 14
