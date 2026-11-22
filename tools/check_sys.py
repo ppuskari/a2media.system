@@ -23,11 +23,21 @@ def check(path: Path) -> dict:
     for label, sig in required.items():
         if sig not in blob:
             raise ValueError(f"missing {label}: {sig.hex()}")
-    for text in (
-        b"A2MEDIA - A2FPGA MCU MEDIA PLAYER",
-        b"NOT DETECTED", b"FAT directory browsing and filenames",
-        b"MCU PLAYER:", b"Jukebox last folder",
-    ):
+    # M2 is a separate experimental browser and deliberately does not
+    # replace the known-good P0 text/control contract on main.
+    if b"A2MEDIA / a2fpga M2 MEDIA BROWSER" in blob:
+        texts = (
+            b"A2MEDIA / a2fpga M2 MEDIA BROWSER",
+            b"M2 extension not detected",
+            b"JUKEBOX START AT FILE",
+        )
+    else:
+        texts = (
+            b"A2MEDIA - A2FPGA MCU MEDIA PLAYER",
+            b"NOT DETECTED", b"FAT directory browsing and filenames",
+            b"MCU PLAYER:", b"Jukebox last folder",
+        )
+    for text in texts:
         if text not in blob:
             raise ValueError(f"UI text missing: {text!r}")
     return {
