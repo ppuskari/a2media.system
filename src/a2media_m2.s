@@ -417,36 +417,52 @@ EntryPointer:
 
 SelectDown:
     lda M2Ready
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     lda Selected
     clc
     adc #1
     cmp PageCount
-    bcs Redraw
+    bcc :+
+    jmp Redraw
+:
     sta Selected
     jmp Redraw
 SelectUp:
     lda Selected
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     dec Selected
     jmp Redraw
 NextPage:
     lda M2Ready
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     lda PageEnd
-    bne Redraw
+    beq :+
+    jmp Redraw
+:
     inc PageNo
     jsr FetchPage
     lda PageCount
-    bne Redraw
+    beq :+
+    jmp Redraw
+:
     dec PageNo
     jsr ReopenAtPage
     jmp Redraw
 PreviousPage:
     lda M2Ready
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     lda PageNo
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     dec PageNo
     jsr ReopenAtPage
     jmp Redraw
@@ -537,11 +553,17 @@ BuildSelectedPath:
 
 ChooseEntry:
     lda M2Ready
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     lda PageCount
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     jsr BuildSelectedPath
-    bcs Redraw
+    bcc :+
+    jmp Redraw
+:
     ldx Selected
     lda Kinds,x
     beq @play
@@ -566,14 +588,22 @@ ChooseEntry:
 
 StartJukebox:
     lda M2Ready
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     lda PageCount
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     ldx Selected
     lda Kinds,x
-    bne Redraw
+    beq :+
+    jmp Redraw
+:
     jsr BuildSelectedPath
-    bcs Redraw
+    bcc :+
+    jmp Redraw
+:
     jsr SetWorkPointer
     lda #JUKE_START
     jsr SendWithPath
@@ -581,7 +611,9 @@ StartJukebox:
 
 ParentFolder:
     lda M2Ready
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     ldx #0
 @len:
     lda CurrentPath,x
@@ -629,14 +661,20 @@ QuerySource:
 
 RefreshStatus:
     lda M2Ready
-    beq Redraw
+    bne :+
+    jmp Redraw
+:
     lda #STATUS
     jsr SendCommand
     lda LastResult
-    bne Redraw
+    beq :+
+    jmp Redraw
+:
     lda MB_DATA             ; length=5
     cmp #5
-    bne Redraw
+    beq :+
+    jmp Redraw
+:
     lda MB_DATA
     sta PlayerState
     lda MB_DATA
