@@ -36,6 +36,33 @@ Generated raw binary: **dist/A2MEDIA.SYSTEM**, with no load header. When copying
 
 GitHub Actions compiles and validates the binary, uploads a workflow artifact, and attempts to commit it to dist/A2MEDIA.SYSTEM on main. Check the workflow log and SHA-256 for the exact build.
 
+## Bootable ProDOS 2.4.3 floppy disk images
+
+Two **140 KB (143,360-byte)** images are committed under `disks/`:
+
+- **[A2MEDIA-ProDOS243.po](disks/A2MEDIA-ProDOS243.po)** — ProDOS block/sector order; recommended for ProDOS-aware tools, Cadius, and most modern emulators
+- **[A2MEDIA-ProDOS243.dsk](disks/A2MEDIA-ProDOS243.dsk)** — genuine DOS 3.3 sector ordering, converted from the same `.po`, suitable for software expecting DOS-order `.dsk`
+
+Disk volume is **/PRODOS.2.4.3**. The file `A2MEDIA.SYSTEM` is installed in its root directory with ProDOS file type **SYS ($FF)**, auxiliary type **$2000**, **1,572 bytes**, and **five storage blocks** (sapling index plus four data blocks).
+
+The original `PRODOS`, `BITSY.BOOT`, `QUIT.SYSTEM`, `BASIC.SYSTEM` and all other official distribution files remain in place, in their original catalog order. **Bitsy Bye remains the boot launcher**, and you can choose A2MEDIA.SYSTEM there; the disk does not automatically replace the launcher. No SenseiPlay8 files appear in the catalog.
+
+**Source provenance:** This disk was generated from the official [ProDOS 2.4.3 release image](https://github.com/ProDOS-8/ProDOS8-Releases/blob/master/ProDOS_2_4_3.po), Git blob `d464c92578d4ed15dc4acd49eee43e51256808fd`. The specific earlier SenseiPlay8-modified conversation image was no longer available to edit byte-for-byte; the *official* release was used as the clean source instead. Only root directory metadata, allocation bitmap, and five newly allocated blocks changed. Boot sectors and existing file content are unchanged.
+
+Validate the included images locally:
+
+~~~powershell
+py -3 tools/prodos_disk.py check
+~~~
+
+To regenerate both images from the original ProDOS 2.4.3 ProDOS-order `.po` file and the current A2MEDIA executable:
+
+~~~powershell
+py -3 tools/prodos_disk.py build --base ProDOS_2_4_3.po
+~~~
+
+The builder also removes any root-level files whose names start with `SENSEI` if you later supply a prior SenseiPlay-modified ProDOS-order image. Both images are **disk-structure verified**, not yet hardware-booted on Apple IIe/IIgs.
+
 ## Roadmap
 
 1. P0: 80-column ProDOS 8 M1 controls; physical IIe/IIgs tests.
