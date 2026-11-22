@@ -1013,7 +1013,9 @@ DrawDirectory:
     lda M2Ready
     bne @ready
     lda TextIndex
-    bne @clear
+    beq :+
+    jmp @clear          ; long jump: @clear is > 127 bytes away
+:
     SAY M2Missing
     jmp @clear
 @ready:
