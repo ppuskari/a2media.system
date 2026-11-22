@@ -1,7 +1,7 @@
 name: A2MEDIA P0 ProDOS 8 SYS build
 on:
   push:
-    branches: [main]
+    branches: [main, petar/m2-80col-fat-picker-20261122]
     paths:
       - "src/**"
       - "tools/**"
@@ -31,11 +31,31 @@ jobs:
           python3 tools/check_sys.py dist/A2MEDIA.SYSTEM
           sha256sum dist/A2MEDIA.SYSTEM
           ls -l dist/A2MEDIA.SYSTEM
-      - name: Verify ProDOS 2.4.3 PO/DSK, SYS metadata, and no legacy binaries
+      - name: Verify P0 ProDOS 2.4.3 disk images (main only)
+        if: github.ref == 'refs/heads/main'
         run: |
           python3 tools/prodos_disk.py check
           sha256sum disks/A2MEDIA-ProDOS243.po disks/A2MEDIA-ProDOS243.dsk
-      - name: Upload bootable ProDOS images
+      - name: Build and validate experimental M2 ProDOS 2.4.3 disk images
+        if: github.ref == 'refs/heads/petar/m2-80col-fat-picker-20261122'
+        run: |
+          python3 tools/prodos_disk.py build \
+            --base disks/A2MEDIA-ProDOS243.po \
+            --system dist/A2MEDIA.SYSTEM \
+            --po disks/A2MEDIA-M2-ProDOS243.po \
+            --dsk disks/A2MEDIA-M2-ProDOS243.dsk
+          sha256sum disks/A2MEDIA-M2-ProDOS243.*
+      - name: Upload M2 bootable image test artifacts
+        if: github.ref == 'refs/heads/petar/m2-80col-fat-picker-20261122'
+        uses: actions/upload-artifact@v4
+        with:
+          name: A2MEDIA-M2-ProDOS243-test-images
+          path: |
+            disks/A2MEDIA-M2-ProDOS243.po
+            disks/A2MEDIA-M2-ProDOS243.dsk
+          if-no-files-found: error
+      - name: Upload bootable ProDOS P0 images
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: A2MEDIA-ProDOS243-boot-images
