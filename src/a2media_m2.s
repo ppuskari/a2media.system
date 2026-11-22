@@ -4,9 +4,9 @@
 ; IMPORTANT: Requires paired M2 FPGA and BL616 Stage2; cannot browse FAT
 ; using J2R11 golden firmware. M1-only hardware falls back to basic controls.
 ;
-; Directory pages: 12 entries, independent MCU FAT DIR handle, unsorted
-; directory iteration (NOT MCU playlist sort). Starting at selected file
-; resolves the correct sorted index in the J2R11 HxCMOD worker.
+; Directory pages: 12 entries from the MCU's globally sorted folder
+; snapshot (directories first, MOD names casefolded like J2R11 playlist).
+; Starting at selected file resolves the exact J2R11 sorted index.
 .setcpu "6502"
 
 COUT=$FDED
