@@ -26,6 +26,9 @@ jobs:
           ca65 --version || true
       - name: Assemble original 6502 and link ProDOS SYS at $2000
         run: make check
+      - name: Regression-check incremental 80-column refresh (M2 only)
+        if: github.ref == 'refs/heads/petar/m2-80col-fat-picker-20261122'
+        run: python3 tools/test_incremental_screen.py
       - name: Publish SHA256 and binary contract
         run: |
           python3 tools/check_sys.py dist/A2MEDIA.SYSTEM
