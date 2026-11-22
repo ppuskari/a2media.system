@@ -5,6 +5,8 @@ on:
     paths:
       - "src/**"
       - "tools/**"
+      - "disks/**"
+      - "dist/**"
       - "Makefile"
       - ".github/workflows/build.yml"
   workflow_dispatch:
@@ -29,6 +31,18 @@ jobs:
           python3 tools/check_sys.py dist/A2MEDIA.SYSTEM
           sha256sum dist/A2MEDIA.SYSTEM
           ls -l dist/A2MEDIA.SYSTEM
+      - name: Verify ProDOS 2.4.3 PO/DSK, SYS metadata, and no legacy binaries
+        run: |
+          python3 tools/prodos_disk.py check
+          sha256sum disks/A2MEDIA-ProDOS243.po disks/A2MEDIA-ProDOS243.dsk
+      - name: Upload bootable ProDOS images
+        uses: actions/upload-artifact@v4
+        with:
+          name: A2MEDIA-ProDOS243-boot-images
+          path: |
+            disks/A2MEDIA-ProDOS243.po
+            disks/A2MEDIA-ProDOS243.dsk
+          if-no-files-found: error
       - name: Upload ProDOS SYS executable
         uses: actions/upload-artifact@v4
         with:
