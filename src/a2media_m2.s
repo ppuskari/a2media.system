@@ -700,32 +700,127 @@ QuerySource:
     rts
 
 RefreshStatus:
+    jsr PollStatusAndTitle
+    jmp Redraw
+
+; Get live status and NOW PLAYING from the same generation-stable snapshot
+; shown in the MCU console. Polling does not change the Apple command/result
+; diagnostic and causes a full 80-column redraw only on a real state change.
+PollStatusAndTitle:
     lda M2Ready
     bne :+
-    jmp Redraw
+    rts
 :
+    lda LastCmd
+    sta SavedCmd
+    lda LastResult
+    sta SavedResult
     lda #STATUS
     jsr SendCommand
     lda LastResult
     beq :+
-    jmp Redraw
+    jmp @title
 :
-    lda MB_DATA             ; length=5
+    lda MB_FLAG
+    and #$80
+    bne :+
+    jmp @title
+:
+    lda MB_DATA               ; status payload [5,state,lastLO,lastHI,totalLO,totalHI]
     cmp #5
     beq :+
-    jmp Redraw
+    jmp @title
 :
     lda MB_DATA
+    cmp PlayerState
+    beq :+
     sta PlayerState
+    inc ScreenDirty
+:
     lda MB_DATA
+    cmp LastJukeLo
+    beq :+
     sta LastJukeLo
+    inc ScreenDirty
+:
     lda MB_DATA
+    cmp LastJukeHi
+    beq :+
     sta LastJukeHi
+    inc ScreenDirty
+:
     lda MB_DATA
+    cmp TotalLo
+    beq :+
     sta TotalLo
+    inc ScreenDirty
+:
     lda MB_DATA
+    cmp TotalHi
+    beq :+
     sta TotalHi
-    jmp Redraw
+    inc ScreenDirty
+:
+@title:
+    lda #NOWPLAY
+    jsr SendCommand
+    lda LastResult
+    beq :+
+    jmp @restore
+:
+    lda MB_FLAG
+    and #$80
+    bne :+
+    jmp @restore
+:
+    lda MB_DATA               ; length=1+name bytes
+    cmp #1
+    bcs :+
+    jmp @restore
+:
+    cmp #65
+    bcc :+
+    jmp @restore
+:
+    sec
+    sbc #1
+    sta FrameLen              ; 0..63 bytes
+    lda MB_DATA               ; active bit
+    cmp NowActive
+    beq :+
+    sta NowActive
+    inc ScreenDirty
+:
+    ldy #0
+@readName:
+    cpy FrameLen
+    beq @endName
+    lda MB_DATA
+    sta WorkName,y
+    iny
+    bne @readName
+@endName:
+    lda #0
+    sta WorkName,y
+    ldy #0
+@copyName:
+    lda WorkName,y
+    cmp NowName,y
+    beq :+
+    inc ScreenDirty
+:
+    lda WorkName,y
+    sta NowName,y
+    beq @restore
+    iny
+    cpy #64
+    bcc @copyName
+@restore:
+    lda SavedCmd
+    sta LastCmd
+    lda SavedResult
+    sta LastResult
+    rts
 
 Redraw:
     jsr Draw
@@ -820,6 +915,19 @@ Draw:
     SAY M2Online
 @afterStatus:
     jsr CR
+    SAY NowText
+    lda NowActive
+    beq @noNow
+    lda #<NowName
+    sta PTR
+    lda #>NowName
+    sta PTR+1
+    jsr PrintZ
+    jmp @afterNow
+@noNow:
+    SAY NoNowPlaying
+@afterNow:
+    jsr CR
     SAY PlayerText
     lda Online
     beq @notPlaying
@@ -837,7 +945,6 @@ Draw:
     SAY ResultText
     lda LastResult
     jsr PrintHex
-    jsr CR
     SAY JukeText
     lda LastJukeHi
     jsr PrintHex
