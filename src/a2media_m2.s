@@ -770,7 +770,7 @@ Draw:
     jsr PrintHex
     lda TotalLo
     jsr PrintHex
-    jsr CR
+    ; 24th text row: don't CR here, which would scroll the title away.
     rts
 
 PrintZ:
@@ -832,7 +832,7 @@ QuitParams:
     jmp @trap
 
 .segment "RODATA"
-Title:       .asciiz "A2MEDIA / a2fpga M2 MEDIA BROWSER                             PRO DOS 8"
+Title:       .asciiz "A2MEDIA / a2fpga M2 MEDIA BROWSER                             ProDOS 8"
 SubTitle:    .asciiz "IIe / IIgs  |  80-column FAT file picker  |  44.1 kHz MCU HDMI audio"
 Rule:        .asciiz "-------------------------------------------------------------------------------"
 FolderLabel: .asciiz "FOLDER: /"
@@ -846,7 +846,7 @@ FileMark:    .asciiz " MOD  "
 EmptyFolder: .asciiz "No .MOD files or folders in this directory."
 M2Missing:   .asciiz "M2 extension not detected. Install matching FPGA + BL616 M2 test builds."
 HelpLine1:   .asciiz "UP/DOWN or U/D: select   RETURN: enter directory / play selected MOD"
-HelpLine2:   .asciiz "J: jukebox START AT FILE   F/G: next/previous page   B: parent folder"
+HelpLine2:   .asciiz "J: JUKEBOX START AT FILE   F/G: next/previous page   B: parent folder"
 HelpLine3:   .asciiz "S: stop  R: resume  N/P: next/prev track  I: status  L: reload  Q: quit"
 MsgStatus:   .asciiz "LINK: "
 OfflineText: .asciiz "OFFLINE (slot-3 $C0B0 not found)"
