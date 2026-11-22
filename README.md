@@ -185,3 +185,16 @@ Original J2R11 beta FPGA/MCU binaries remain untouched.
 - .github/workflows/build.yml: automated build and binary publication.
 
 Copyright (c) 2026 Petar Puskarich / contributors. No public redistribution license selected.
+
+**Large-folder M2 timing fix:** The BL616 now ACKs directory OPEN immediately
+and builds its alphabetically sorted FAT catalog in short work chunks. On a
+directory NEXT request it returns MCU result `$EA` while the scan is
+in progress. This application recognizes that transient status and retries
+with a finite bound; an actual read error is reported as such. This fixes
+the Apple-side `DIRECTORY READ FAILED - MCU RC: $E1` that occurred when
+`ProTracker/1` contained ~506 MOD files, even though the MCU console could
+browse it. Previous-page navigation now sends `M2_SEEK ($2B)` with a 16-bit
+little-endian catalog entry index, instead of reopening and rescanning the
+entire SD directory. The **matching M2 BL616 Stage 2 firmware is required**
+for both features; the FPGA bitstream and Floppy Emu slot-6 ProDOS boot
+device are unchanged. Hardware verification is still required.
