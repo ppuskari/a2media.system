@@ -34,10 +34,16 @@ the repository's **main** branch.
 
 M2 lists FAT directories and case-insensitive .MOD files using a dedicated
 MCU directory iterator; source is the **currently mounted SD or USB FAT
-backend**, reported at the top. Files appear in FAT directory order.
-**The MCU's J2R11 jukebox still sorts its own playlist** and resolves the
-full selected path to the proper starting index; starting from the
-highlighted song is exact, independent of UI list order.
+backend**, reported at the top. The MCU takes a snapshot of the entire folder,
+sorts subfolders first and MOD filenames alphabetically (case-insensitive),
+and then sends entries to the Apple II browser in that globally sorted order
+across all 12-entry pages. The .MOD portion matches the existing J2R11
+jukebox sort, so the next jukebox track is the next listed MOD, even across
+pages. The selected starting file still resolves by full relative path.
+A directory with more than 512 visible entries fails open rather than
+silently truncating the listing. No existing HxCMOD audio sorting changes.
+The displayed JUKE position / total fields use five-digit decimal numbers,
+not hexadecimal.
 
 The browser shows **NOW PLAYING** with the actual MOD filename reported by the MCU's generation-stable now-playing snapshot. It updates when the player advances tracks, including during jukebox playback without Apple keyboard input; only changed information triggers a screen redraw. M2 now uses a 16-bit software poll counter (~1 second on a stock 1 MHz IIe; quicker at accelerated CPU speeds) instead of relying on $C019 vertical-blank reads, which may not toggle with a2fpga video hardware. An idle player displays `(none)`. The same snapshot is used by the MCU console, so the highlighted file is not misrepresented as the active song.
 
