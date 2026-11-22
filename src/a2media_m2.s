@@ -750,31 +750,41 @@ PollStatusAndTitle:
     cmp PlayerState
     beq :+
     sta PlayerState
-    inc ScreenDirty
+    lda ScreenDirty
+    ora #2
+    sta ScreenDirty
 :
     lda MB_DATA
     cmp LastJukeLo
     beq :+
     sta LastJukeLo
-    inc ScreenDirty
+    lda ScreenDirty
+    ora #4
+    sta ScreenDirty
 :
     lda MB_DATA
     cmp LastJukeHi
     beq :+
     sta LastJukeHi
-    inc ScreenDirty
+    lda ScreenDirty
+    ora #4
+    sta ScreenDirty
 :
     lda MB_DATA
     cmp TotalLo
     beq :+
     sta TotalLo
-    inc ScreenDirty
+    lda ScreenDirty
+    ora #4
+    sta ScreenDirty
 :
     lda MB_DATA
     cmp TotalHi
     beq :+
     sta TotalHi
-    inc ScreenDirty
+    lda ScreenDirty
+    ora #4
+    sta ScreenDirty
 :
 @title:
     lda #NOWPLAY
@@ -804,7 +814,9 @@ PollStatusAndTitle:
     cmp NowActive
     beq :+
     sta NowActive
-    inc ScreenDirty
+    lda ScreenDirty
+    ora #1
+    sta ScreenDirty
 :
     ldy #0
 @readName:
@@ -822,7 +834,9 @@ PollStatusAndTitle:
     lda WorkName,y
     cmp NowName,y
     beq :+
-    inc ScreenDirty
+    lda ScreenDirty
+    ora #1
+    sta ScreenDirty
 :
     lda WorkName,y
     sta NowName,y
@@ -1012,7 +1026,9 @@ DrawDirectory:
     inc TextIndex
     lda TextIndex
     cmp #PAGE_SIZE
-    bne @row
+    bcs @done
+    jmp @row
+@done:
     rts
 
 ; Arrow keys change precisely two characters in video RAM: erase the old
