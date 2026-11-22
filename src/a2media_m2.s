@@ -260,8 +260,16 @@ Probe:
 
 ; A=command. Return after M1 ACK and store result, never wait indefinitely.
 ; This doesn't repaint the FPGA diagnostic console or touch SPI6 PCM.
+; The MCU acknowledges M2 DIR_OPEN immediately, then builds the sorted
+; FAT catalog in short work chunks. DIR_NEXT reports $EA (pending) until it
+; is complete; transparently retry only DIR_NEXT, with an explicit limit.
+; This also covers reopening and skipping to a previous 12-entry page.
 SendCommand:
     sta LastCmd
+    lda #0
+    sta RetryCountLo
+    sta RetryCountHi
+@send:
     lda #$e0
     sta LastResult
     lda Online
@@ -274,9 +282,8 @@ SendCommand:
     sta MB_CMD
     lda MB_SEQ
     sta Expected
-    ; Three-byte bounded timeout: the IIgs can execute short 6502
-    ; polling loops much faster than the IIe. Allow the disk thread time
-    ; to answer an M2 directory call even under concurrent MOD loading.
+    ; ACK must still be prompt for each individual command. Scans never
+    ; run inside this handshake; only the later DIR_NEXT result is $EA.
     lda #$08
     sta TimeoutHigh
     ldy #$ff
@@ -296,6 +303,22 @@ SendCommand:
     rts
 @acked:
     lda MB_RC
+    sta LastResult
+    cmp #$ea              ; M2 catalog not yet ready
+    bne @done
+    lda LastCmd
+    cmp #DIR_NEXT
+    bne @done             ; NOWPLAY $EA retains its previous semantics
+    inc RetryCountLo
+    bne @again
+    inc RetryCountHi
+    lda RetryCountHi
+    cmp #$20              ; bounded: 8192 MCU poll requests
+    bcs @retryTimedOut
+@again:
+    jmp @send
+@retryTimedOut:
+    lda #$e1              ; unresponsive after extended pending interval
     sta LastResult
 @done:
     rts
@@ -1321,6 +1344,8 @@ LastCmd:        .res 1
 LastResult:     .res 1
 Expected:       .res 1
 TimeoutHigh:    .res 1
+RetryCountLo:   .res 1
+RetryCountHi:   .res 1
 SourceUSB:      .res 1
 LastJukeLo:     .res 1
 LastJukeHi:     .res 1
