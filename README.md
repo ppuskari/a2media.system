@@ -39,7 +39,7 @@ backend**, reported at the top. Files appear in FAT directory order.
 full selected path to the proper starting index; starting from the
 highlighted song is exact, independent of UI list order.
 
-The browser shows **NOW PLAYING** with the actual MOD filename reported by the MCU's generation-stable now-playing snapshot. It updates when the player advances tracks, including during jukebox playback without Apple keyboard input; only changed information triggers a screen redraw. An idle player displays `(none)`. The same snapshot is used by the MCU console, so the highlighted file is not misrepresented as the active song.
+The browser shows **NOW PLAYING** with the actual MOD filename reported by the MCU's generation-stable now-playing snapshot. It updates when the player advances tracks, including during jukebox playback without Apple keyboard input; only changed information triggers a screen redraw. M2 now uses a 16-bit software poll counter (~1 second on a stock 1 MHz IIe; quicker at accelerated CPU speeds) instead of relying on $C019 vertical-blank reads, which may not toggle with a2fpga video hardware. An idle player displays `(none)`. The same snapshot is used by the MCU console, so the highlighted file is not misrepresented as the active song.
 
 The custom **bidirectional M2 reply FIFO** preserves the existing M1
 Apple $C0B0–$C0BF ABI; data is read via $C0B5, opposite to its existing
