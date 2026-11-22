@@ -41,6 +41,20 @@ highlighted song is exact, independent of UI list order.
 
 The browser shows **NOW PLAYING** with the actual MOD filename reported by the MCU's generation-stable now-playing snapshot. It updates when the player advances tracks, including during jukebox playback without Apple keyboard input; only changed information triggers a screen redraw. M2 now uses a 16-bit software poll counter (~1 second on a stock 1 MHz IIe; quicker at accelerated CPU speeds) instead of relying on $C019 vertical-blank reads, which may not toggle with a2fpga video hardware. An idle player displays `(none)`. The same snapshot is used by the MCU console, so the highlighted file is not misrepresented as the active song.
 
+**Incremental 80-column screen updates:** The application issues Ctrl-L only on first
+launch. After that it uses the Apple IIe/IIgs 80-column firmware's Ctrl-^
+cursor-positioning command and Ctrl-] clear-to-EOL, not direct AUX-video-RAM
+writes. Up/Down changes only the two `>` selection-marker characters. Directory
+paging and folder changes replace only the 12 fixed file rows (5–16), and
+folder changes also refresh the path line. NOW PLAYING is updated independently
+on row 22; MCU state, command/result and jukebox position are fixed fields
+on row 23, repainted only when their values change. The title, help text,
+separator rules and link label are never redrawn during navigation.
+
+The `tools/test_incremental_screen.py` guard runs in the M2 GitHub Actions
+build after ca65/ld65 and prevents accidental reintroduction of a
+full-screen redraw into the key or polling paths.
+
 The custom **bidirectional M2 reply FIFO** preserves the existing M1
 Apple $C0B0–$C0BF ABI; data is read via $C0B5, opposite to its existing
 Apple upload-write direction. New M2 commands are negotiated by the MCU
