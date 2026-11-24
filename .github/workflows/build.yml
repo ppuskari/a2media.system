@@ -1,7 +1,7 @@
 name: A2MEDIA P0 ProDOS 8 SYS build
 on:
   push:
-    branches: [main]
+    branches: [main, petar/m2-80col-fat-picker-20261122]
     paths:
       - "src/**"
       - "tools/**"
@@ -26,16 +26,39 @@ jobs:
           ca65 --version || true
       - name: Assemble original 6502 and link ProDOS SYS at $2000
         run: make check
+      - name: Regression-check incremental 80-column refresh (M2 only)
+        if: github.ref == 'refs/heads/petar/m2-80col-fat-picker-20261122'
+        run: python3 tools/test_incremental_screen.py
       - name: Publish SHA256 and binary contract
         run: |
           python3 tools/check_sys.py dist/A2MEDIA.SYSTEM
           sha256sum dist/A2MEDIA.SYSTEM
           ls -l dist/A2MEDIA.SYSTEM
-      - name: Verify ProDOS 2.4.3 PO/DSK, SYS metadata, and no legacy binaries
+      - name: Verify P0 ProDOS 2.4.3 disk images (main only)
+        if: github.ref == 'refs/heads/main'
         run: |
           python3 tools/prodos_disk.py check
           sha256sum disks/A2MEDIA-ProDOS243.po disks/A2MEDIA-ProDOS243.dsk
-      - name: Upload bootable ProDOS images
+      - name: Build and validate experimental M2 ProDOS 2.4.3 disk images
+        if: github.ref == 'refs/heads/petar/m2-80col-fat-picker-20261122'
+        run: |
+          python3 tools/prodos_disk.py build \
+            --base disks/A2MEDIA-ProDOS243.po \
+            --system dist/A2MEDIA.SYSTEM \
+            --po disks/A2MEDIA-M2-ProDOS243.po \
+            --dsk disks/A2MEDIA-M2-ProDOS243.dsk
+          sha256sum disks/A2MEDIA-M2-ProDOS243.*
+      - name: Upload M2 bootable image test artifacts
+        if: github.ref == 'refs/heads/petar/m2-80col-fat-picker-20261122'
+        uses: actions/upload-artifact@v4
+        with:
+          name: A2MEDIA-M2-ProDOS243-test-images
+          path: |
+            disks/A2MEDIA-M2-ProDOS243.po
+            disks/A2MEDIA-M2-ProDOS243.dsk
+          if-no-files-found: error
+      - name: Upload bootable ProDOS P0 images
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: A2MEDIA-ProDOS243-boot-images
@@ -49,6 +72,23 @@ jobs:
           name: A2MEDIA-SYSTEM-P0
           path: dist/A2MEDIA.SYSTEM
           if-no-files-found: error
+      - name: Publish experimental M2 ProDOS SYS and images on isolated branch
+        if: github.ref == 'refs/heads/petar/m2-80col-fat-picker-20261122' && github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/A2MEDIA.SYSTEM \
+            disks/A2MEDIA-M2-ProDOS243.po disks/A2MEDIA-M2-ProDOS243.dsk
+          if git diff --cached --quiet; then
+            echo "Experimental M2 binary and disk images already current"
+          else
+            git commit -m "build: publish verified M2 P8 app and ProDOS243 disk images [skip ci]"
+            # Docs/source may have landed while CI was running. Rebase only the
+            # generated-file commit onto current remote; never force-push.
+            git fetch origin petar/m2-80col-fat-picker-20261122
+            git rebase origin/petar/m2-80col-fat-picker-20261122
+            git push origin HEAD:petar/m2-80col-fat-picker-20261122
+          fi
       - name: Commit built executable into repository
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
